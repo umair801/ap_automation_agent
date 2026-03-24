@@ -42,5 +42,9 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/metrics/health')" || exit 1
 
-# Start the FastAPI app with Uvicorn
-CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2
+# Copy and make start script executable
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Start the FastAPI app via shell script
+CMD ["/bin/sh", "/app/start.sh"]
