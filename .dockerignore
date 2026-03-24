@@ -1,0 +1,23 @@
+# .dockerignore
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.env.*
+!.env.example
+*.egg-info/
+dist/
+build/
+.git/
+.gitignore
+.pytest_cache/
+*.log
+*.sqlite
+.DS_Store
+Thumbs.db
+tests/sample_invoice.pdf
+README.md

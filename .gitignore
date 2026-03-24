@@ -1,0 +1,38 @@
+# .gitignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+*.sqlite
+
+# Temp files
+/tmp/
+
+# Google OAuth credentials — never commit
+gmail_credentials.json
+token.json
+credentials.json
+*.json
+!railway.json

@@ -1,0 +1,45 @@
+# Core framework
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# LangGraph + LangChain
+langgraph==0.2.35
+langchain==0.3.0
+langchain-openai==0.2.0
+
+# OpenAI
+openai==1.51.0
+
+# Document processing
+pymupdf==1.24.10
+pytesseract==0.3.13
+Pillow==10.4.0
+
+# Database
+supabase==2.7.4
+
+# Task queue
+celery==5.4.0
+redis==5.1.1
+
+# Email integrations
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.149.0
+
+# Notifications
+sendgrid==6.11.0
+twilio==9.3.4
+
+# Logging
+structlog==24.4.0
+
+# HTTP client
+httpx==0.27.2
+
+# Utilities
+python-dotenv==1.0.1
+python-multipart==0.0.12
+tenacity==8.3.0
