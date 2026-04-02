@@ -1,6 +1,5 @@
 # api/ingestion_router.py
 
-import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -10,10 +9,9 @@ from fastapi.responses import JSONResponse
 
 from core.database import insert_invoice
 from core.config import get_settings
-from parsers.pdf_parser import parse_pdf
 from agents.extraction_agent import run_extraction_agent
 from agents.validation_agent import run_validation_agent
-from core.models import InvoiceStatus
+from core.models import Invoice, InvoiceStatus, IngestionSource
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
@@ -39,19 +37,8 @@ async def ingest_pdf(file: Annotated[UploadFile, File(description="Invoice PDF f
         if len(contents) == 0:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-        temp_path = f"/tmp/{uuid.uuid4()}_{file.filename}"
-        with open(temp_path, "wb") as f:
-            f.write(contents)
-
-        parse_result = parse_pdf(temp_path)
-        extracted_text = parse_result.text
-        if not extracted_text:
-            raise HTTPException(
-                status_code=422, detail="Could not extract text from PDF."
-            )
-
-        invoice = run_extraction_agent(extracted_text)
-        invoice.source = "pdf_upload"
+        invoice = Invoice(source=IngestionSource.PDF_UPLOAD)
+        invoice = run_extraction_agent(invoice, contents)
 
         validation_result = run_validation_agent(invoice)
 
@@ -67,7 +54,7 @@ async def ingest_pdf(file: Annotated[UploadFile, File(description="Invoice PDF f
             "po_number": invoice.po_number,
             "payment_terms": invoice.payment_terms,
             "status": InvoiceStatus.VALIDATED if validation_result.is_valid else InvoiceStatus.EXCEPTION,
-            "source": "pdf_upload",
+            "source": IngestionSource.PDF_UPLOAD.value,
         }
         insert_invoice(invoice_data)
 
@@ -119,8 +106,9 @@ async def ingest_email_webhook(request: Request):
                 content={"status": "ignored", "reason": "No body or attachments found."},
             )
 
-        invoice = run_extraction_agent(body)
-        invoice.source = "email_webhook"
+        from agents.extraction_agent import extract_invoice_text_mode
+        invoice = Invoice(source=IngestionSource.EMAIL)
+        invoice = extract_invoice_text_mode(invoice, body)
 
         validation_result = run_validation_agent(invoice)
 
@@ -133,7 +121,7 @@ async def ingest_email_webhook(request: Request):
             "currency": invoice.currency,
             "po_number": invoice.po_number,
             "status": InvoiceStatus.VALIDATED if validation_result.is_valid else InvoiceStatus.EXCEPTION,
-            "source": "email_webhook",
+            "source": IngestionSource.EMAIL.value,
         }
         insert_invoice(invoice_data)
 
@@ -182,8 +170,8 @@ async def ingest_edi(file: Annotated[UploadFile, File(description="EDI 810 invoi
                 detail="File does not appear to be a valid EDI 810 invoice.",
             )
 
-        invoice = run_extraction_agent(edi_text)
-        invoice.source = "edi"
+        invoice = Invoice(source=IngestionSource.EDI)
+        invoice = run_extraction_agent(invoice, contents)
 
         validation_result = run_validation_agent(invoice)
 
@@ -196,7 +184,7 @@ async def ingest_edi(file: Annotated[UploadFile, File(description="EDI 810 invoi
             "currency": invoice.currency,
             "po_number": invoice.po_number,
             "status": InvoiceStatus.VALIDATED if validation_result.is_valid else InvoiceStatus.EXCEPTION,
-            "source": "edi",
+            "source": IngestionSource.EDI.value,
         }
         insert_invoice(invoice_data)
 
