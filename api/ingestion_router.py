@@ -45,33 +45,36 @@ async def ingest_pdf(file: Annotated[UploadFile, File(description="Invoice PDF f
         is_valid = invoice.status == InvoiceStatus.VALIDATED
         vendor_name = invoice.vendor.vendor_name if invoice.vendor else None
         error_codes = [e.error_code for e in invoice.validation_errors]
+        is_duplicate = "DUPLICATE_INVOICE" in error_codes
 
-        invoice_data = {
-            "invoice_number": invoice.invoice_number,
-            "vendor_name": vendor_name,
-            "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
-            "due_date": str(invoice.due_date) if invoice.due_date else None,
-            "total_amount": float(invoice.total) if invoice.total else None,
-            "subtotal": float(invoice.subtotal) if invoice.subtotal else None,
-            "tax_amount": float(invoice.tax) if invoice.tax else None,
-            "currency": invoice.currency,
-            "po_number": invoice.po_number,
-            "payment_terms": invoice.payment_terms,
-            "status": invoice.status,
-            "source": IngestionSource.PDF_UPLOAD.value,
-        }
-        insert_invoice(invoice_data)
+        if not is_duplicate:
+            invoice_data = {
+                "invoice_number": invoice.invoice_number,
+                "vendor_name": vendor_name,
+                "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
+                "due_date": str(invoice.due_date) if invoice.due_date else None,
+                "total_amount": float(invoice.total) if invoice.total else None,
+                "subtotal": float(invoice.subtotal) if invoice.subtotal else None,
+                "tax_amount": float(invoice.tax) if invoice.tax else None,
+                "currency": invoice.currency,
+                "po_number": invoice.po_number,
+                "payment_terms": invoice.payment_terms,
+                "status": invoice.status,
+                "source": IngestionSource.PDF_UPLOAD.value,
+            }
+            insert_invoice(invoice_data)
 
         log.info(
             "pdf_invoice_processed",
             invoice_number=invoice.invoice_number,
             valid=is_valid,
+            duplicate=is_duplicate,
         )
 
         return JSONResponse(
             status_code=200,
             content={
-                "status": "success",
+                "status": "duplicate" if is_duplicate else "success",
                 "invoice_number": invoice.invoice_number,
                 "vendor_name": vendor_name,
                 "total_amount": float(invoice.total) if invoice.total else None,
@@ -118,34 +121,39 @@ async def ingest_email_webhook(request: Request):
 
         email_is_valid = invoice.status == InvoiceStatus.VALIDATED
         email_vendor_name = invoice.vendor.vendor_name if invoice.vendor else None
+        email_error_codes = [e.error_code for e in invoice.validation_errors]
+        email_is_duplicate = "DUPLICATE_INVOICE" in email_error_codes
 
-        invoice_data = {
-            "invoice_number": invoice.invoice_number,
-            "vendor_name": email_vendor_name,
-            "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
-            "due_date": str(invoice.due_date) if invoice.due_date else None,
-            "total_amount": float(invoice.total) if invoice.total else None,
-            "currency": invoice.currency,
-            "po_number": invoice.po_number,
-            "status": invoice.status,
-            "source": IngestionSource.EMAIL.value,
-        }
-        insert_invoice(invoice_data)
+        if not email_is_duplicate:
+            invoice_data = {
+                "invoice_number": invoice.invoice_number,
+                "vendor_name": email_vendor_name,
+                "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
+                "due_date": str(invoice.due_date) if invoice.due_date else None,
+                "total_amount": float(invoice.total) if invoice.total else None,
+                "currency": invoice.currency,
+                "po_number": invoice.po_number,
+                "status": invoice.status,
+                "source": IngestionSource.EMAIL.value,
+            }
+            insert_invoice(invoice_data)
 
         log.info(
             "email_invoice_processed",
             invoice_number=invoice.invoice_number,
             sender=sender,
             valid=email_is_valid,
+            duplicate=email_is_duplicate,
         )
 
         return JSONResponse(
             status_code=200,
             content={
-                "status": "success",
+                "status": "duplicate" if email_is_duplicate else "success",
                 "invoice_number": invoice.invoice_number,
                 "vendor_name": email_vendor_name,
                 "validation_passed": email_is_valid,
+                "validation_errors": email_error_codes,
             },
         )
 
@@ -184,33 +192,38 @@ async def ingest_edi(file: Annotated[UploadFile, File(description="EDI 810 invoi
 
         edi_is_valid = invoice.status == InvoiceStatus.VALIDATED
         edi_vendor_name = invoice.vendor.vendor_name if invoice.vendor else None
+        edi_error_codes = [e.error_code for e in invoice.validation_errors]
+        edi_is_duplicate = "DUPLICATE_INVOICE" in edi_error_codes
 
-        invoice_data = {
-            "invoice_number": invoice.invoice_number,
-            "vendor_name": edi_vendor_name,
-            "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
-            "due_date": str(invoice.due_date) if invoice.due_date else None,
-            "total_amount": float(invoice.total) if invoice.total else None,
-            "currency": invoice.currency,
-            "po_number": invoice.po_number,
-            "status": invoice.status,
-            "source": IngestionSource.EDI.value,
-        }
-        insert_invoice(invoice_data)
+        if not edi_is_duplicate:
+            invoice_data = {
+                "invoice_number": invoice.invoice_number,
+                "vendor_name": edi_vendor_name,
+                "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
+                "due_date": str(invoice.due_date) if invoice.due_date else None,
+                "total_amount": float(invoice.total) if invoice.total else None,
+                "currency": invoice.currency,
+                "po_number": invoice.po_number,
+                "status": invoice.status,
+                "source": IngestionSource.EDI.value,
+            }
+            insert_invoice(invoice_data)
 
         log.info(
             "edi_invoice_processed",
             invoice_number=invoice.invoice_number,
             valid=edi_is_valid,
+            duplicate=edi_is_duplicate,
         )
 
         return JSONResponse(
             status_code=200,
             content={
-                "status": "success",
+                "status": "duplicate" if edi_is_duplicate else "success",
                 "invoice_number": invoice.invoice_number,
                 "vendor_name": edi_vendor_name,
                 "validation_passed": edi_is_valid,
+                "validation_errors": edi_error_codes,
             },
         )
 
