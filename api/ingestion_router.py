@@ -39,21 +39,24 @@ async def ingest_pdf(file: Annotated[UploadFile, File(description="Invoice PDF f
 
         invoice = Invoice(source=IngestionSource.PDF_UPLOAD)
         invoice = run_extraction_agent(invoice, contents)
+        invoice = run_validation_agent(invoice)
 
-        validation_result = run_validation_agent(invoice)
+        is_valid = invoice.status == InvoiceStatus.VALIDATED
+        vendor_name = invoice.vendor.vendor_name if invoice.vendor else None
+        error_codes = [e.error_code for e in invoice.validation_errors]
 
         invoice_data = {
             "invoice_number": invoice.invoice_number,
-            "vendor_name": invoice.vendor_name,
+            "vendor_name": vendor_name,
             "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
             "due_date": str(invoice.due_date) if invoice.due_date else None,
-            "total_amount": float(invoice.total_amount) if invoice.total_amount else None,
+            "total_amount": float(invoice.total) if invoice.total else None,
             "subtotal": float(invoice.subtotal) if invoice.subtotal else None,
-            "tax_amount": float(invoice.tax_amount) if invoice.tax_amount else None,
+            "tax_amount": float(invoice.tax) if invoice.tax else None,
             "currency": invoice.currency,
             "po_number": invoice.po_number,
             "payment_terms": invoice.payment_terms,
-            "status": InvoiceStatus.VALIDATED if validation_result.is_valid else InvoiceStatus.EXCEPTION,
+            "status": invoice.status,
             "source": IngestionSource.PDF_UPLOAD.value,
         }
         insert_invoice(invoice_data)
@@ -61,7 +64,7 @@ async def ingest_pdf(file: Annotated[UploadFile, File(description="Invoice PDF f
         log.info(
             "pdf_invoice_processed",
             invoice_number=invoice.invoice_number,
-            valid=validation_result.is_valid,
+            valid=is_valid,
         )
 
         return JSONResponse(
@@ -69,10 +72,10 @@ async def ingest_pdf(file: Annotated[UploadFile, File(description="Invoice PDF f
             content={
                 "status": "success",
                 "invoice_number": invoice.invoice_number,
-                "vendor_name": invoice.vendor_name,
-                "total_amount": float(invoice.total_amount) if invoice.total_amount else None,
-                "validation_passed": validation_result.is_valid,
-                "validation_errors": validation_result.errors,
+                "vendor_name": vendor_name,
+                "total_amount": float(invoice.total) if invoice.total else None,
+                "validation_passed": is_valid,
+                "validation_errors": error_codes,
             },
         )
 
@@ -109,18 +112,20 @@ async def ingest_email_webhook(request: Request):
         from agents.extraction_agent import extract_invoice_text_mode
         invoice = Invoice(source=IngestionSource.EMAIL)
         invoice = extract_invoice_text_mode(invoice, body)
+        invoice = run_validation_agent(invoice)
 
-        validation_result = run_validation_agent(invoice)
+        email_is_valid = invoice.status == InvoiceStatus.VALIDATED
+        email_vendor_name = invoice.vendor.vendor_name if invoice.vendor else None
 
         invoice_data = {
             "invoice_number": invoice.invoice_number,
-            "vendor_name": invoice.vendor_name,
+            "vendor_name": email_vendor_name,
             "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
             "due_date": str(invoice.due_date) if invoice.due_date else None,
-            "total_amount": float(invoice.total_amount) if invoice.total_amount else None,
+            "total_amount": float(invoice.total) if invoice.total else None,
             "currency": invoice.currency,
             "po_number": invoice.po_number,
-            "status": InvoiceStatus.VALIDATED if validation_result.is_valid else InvoiceStatus.EXCEPTION,
+            "status": invoice.status,
             "source": IngestionSource.EMAIL.value,
         }
         insert_invoice(invoice_data)
@@ -129,7 +134,7 @@ async def ingest_email_webhook(request: Request):
             "email_invoice_processed",
             invoice_number=invoice.invoice_number,
             sender=sender,
-            valid=validation_result.is_valid,
+            valid=email_is_valid,
         )
 
         return JSONResponse(
@@ -137,8 +142,8 @@ async def ingest_email_webhook(request: Request):
             content={
                 "status": "success",
                 "invoice_number": invoice.invoice_number,
-                "vendor_name": invoice.vendor_name,
-                "validation_passed": validation_result.is_valid,
+                "vendor_name": email_vendor_name,
+                "validation_passed": email_is_valid,
             },
         )
 
@@ -172,18 +177,20 @@ async def ingest_edi(file: Annotated[UploadFile, File(description="EDI 810 invoi
 
         invoice = Invoice(source=IngestionSource.EDI)
         invoice = run_extraction_agent(invoice, contents)
+        invoice = run_validation_agent(invoice)
 
-        validation_result = run_validation_agent(invoice)
+        edi_is_valid = invoice.status == InvoiceStatus.VALIDATED
+        edi_vendor_name = invoice.vendor.vendor_name if invoice.vendor else None
 
         invoice_data = {
             "invoice_number": invoice.invoice_number,
-            "vendor_name": invoice.vendor_name,
+            "vendor_name": edi_vendor_name,
             "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
             "due_date": str(invoice.due_date) if invoice.due_date else None,
-            "total_amount": float(invoice.total_amount) if invoice.total_amount else None,
+            "total_amount": float(invoice.total) if invoice.total else None,
             "currency": invoice.currency,
             "po_number": invoice.po_number,
-            "status": InvoiceStatus.VALIDATED if validation_result.is_valid else InvoiceStatus.EXCEPTION,
+            "status": invoice.status,
             "source": IngestionSource.EDI.value,
         }
         insert_invoice(invoice_data)
@@ -191,7 +198,7 @@ async def ingest_edi(file: Annotated[UploadFile, File(description="EDI 810 invoi
         log.info(
             "edi_invoice_processed",
             invoice_number=invoice.invoice_number,
-            valid=validation_result.is_valid,
+            valid=edi_is_valid,
         )
 
         return JSONResponse(
@@ -199,8 +206,8 @@ async def ingest_edi(file: Annotated[UploadFile, File(description="EDI 810 invoi
             content={
                 "status": "success",
                 "invoice_number": invoice.invoice_number,
-                "vendor_name": invoice.vendor_name,
-                "validation_passed": validation_result.is_valid,
+                "vendor_name": edi_vendor_name,
+                "validation_passed": edi_is_valid,
             },
         )
 
